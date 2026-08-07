@@ -1,0 +1,347 @@
+{% load fa_filters %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}مدیریت بودجه{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0f766e;
+      --primary-dark: #115e59;
+      --primary-light: #ccfbf1;
+      --bg: #f0fdfa;
+      --card: #ffffff;
+      --text: #134e4a;
+      --muted: #64748b;
+      --danger: #dc2626;
+      --success: #059669;
+      --income: #059669;
+      --expense: #dc2626;
+      --border: #e2e8f0;
+      --shadow: 0 4px 16px rgba(15, 118, 110, 0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Vazirmatn', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { text-decoration: none; color: inherit; }
+
+    /* ===== Top Nav ===== */
+    .navbar {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      padding: 0 24px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar .brand {
+      font-size: 20px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .navbar .links { display: flex; gap: 4px; align-items: center; }
+    .navbar .links a {
+      color: rgba(255, 255, 255, 0.9);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+    .navbar .links a:hover, .navbar .links a.active { background: rgba(255, 255, 255, 0.15); }
+    .navbar .logout { background: rgba(255, 255, 255, 0.12); border-radius: 8px; }
+    .navbar .logout:hover { background: rgba(255, 255, 255, 0.25); }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 28px 16px 60px; }
+
+    /* ===== Cards & Grid ===== */
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      border: 1px solid var(--border);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: var(--card);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stat .label { font-size: 13px; color: var(--muted); }
+    .stat .value { font-size: 22px; font-weight: 800; }
+    .stat.income .value { color: var(--income); }
+    .stat.expense .value { color: var(--expense); }
+    .stat.balance .value { color: var(--primary); }
+
+    /* ===== Buttons ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
+    .btn-outline:hover { background: var(--primary-light); }
+    .btn-danger { background: var(--danger); color: #fff; padding: 6px 12px; font-size: 12px; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-ghost { background: transparent; color: var(--muted); padding: 6px 12px; font-size: 13px; }
+    .btn-ghost:hover { background: #f1f5f9; color: var(--text); }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .header-row h1 { font-size: 24px; font-weight: 800; }
+    .header-row .sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+    /* ===== Table ===== */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px 14px; text-align: right; border-bottom: 1px solid var(--border); font-size: 14px; }
+    th { color: var(--muted); font-size: 12px; font-weight: 700; background: #f8fafc; }
+    tr:hover td { background: #f0fdfa; }
+    .amount-income { color: var(--income); font-weight: 700; }
+    .amount-expense { color: var(--expense); font-weight: 700; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge.income { background: #d1fae5; color: #065f46; }
+    .badge.expense { background: #fee2e2; color: #991b1b; }
+    .icon-circle {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      background: var(--primary-light);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    /* ===== Forms ===== */
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 700; }
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text);
+      transition: border 0.2s;
+    }
+    .form-control:focus { outline: none; border-color: var(--primary); }
+    .radio-group { display: flex; gap: 16px; }
+    .radio-group input { display: none; }
+    .radio-group label {
+      padding: 10px 24px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      transition: all 0.2s;
+      color: var(--muted);
+    }
+    .radio-group label:has(input:checked) { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .radio-group label:has(input:checked) + label { }
+    .errorlist { list-style: none; color: var(--danger); font-size: 13px; margin-top: 6px; }
+    .form-actions { display: flex; gap: 12px; margin-top: 24px; }
+
+    /* ===== Login ===== */
+    .login-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      padding: 16px;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 36px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+      text-align: center;
+    }
+    .login-card .logo { font-size: 44px; }
+    .login-card h1 { font-size: 22px; margin: 12px 0 4px; }
+    .login-card .hint { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+    .login-card .form-group { text-align: right; }
+    .login-card .btn { width: 100%; }
+
+    /* ===== Categories ===== */
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .cat-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .cat-item:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+    .cat-item .icon { font-size: 28px; }
+    .cat-item .name { font-size: 14px; font-weight: 700; margin-top: 8px; }
+    .cat-item .del {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: #fee2e2;
+      color: var(--danger);
+      border: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      display: none;
+    }
+    .cat-item:hover .del { display: block; }
+
+    .empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 15px; }
+    .empty .big { font-size: 40px; margin-bottom: 10px; }
+
+    .section-title { font-size: 16px; font-weight: 800; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 20px; }
+    .filter-bar .form-group { margin-bottom: 0; }
+    .filter-bar select { min-width: 130px; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 50%;
+      transform: translateX(50%);
+      background: var(--primary-dark);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 200;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ===== Budget Progress ===== */
+    .progress { height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
+    .progress-fill.ok { background: var(--success); }
+    .progress-fill.warn { background: #f59e0b; }
+    .progress-fill.over { background: var(--danger); }
+    .budget-alert-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+      margin-bottom: 10px; background: #fff8f8;
+    }
+    .budget-alert-item.warn { background: #fffbeb; }
+    .budget-alert-item.over { background: #fef2f2; }
+    .budget-alert-item .icon-circle { flex-shrink: 0; }
+    .budget-alert-item .info { flex: 1; }
+    .budget-alert-item .info .name { font-weight: 700; font-size: 14px; }
+    .budget-alert-item .info .detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .budget-alert-item .progress { flex: 1; min-width: 90px; max-width: 180px; }
+    .budget-alert-item .status-badge {
+      font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+    }
+    .budget-alert-item.warn .status-badge { background: #fef3c7; color: #92400e; }
+    .budget-alert-item.over .status-badge { background: #fee2e2; color: #991b1b; }
+
+    @media (max-width: 600px) {
+      .navbar { padding: 0 12px; }
+      .navbar .links a span.hide-mobile { display: none; }
+      .stat .value { font-size: 18px; }
+      .header-row h1 { font-size: 20px; }
+    }
+  </style>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  {% if user.is_authenticated %}
+  <nav class="navbar">
+    <a href="{% url 'dashboard' %}" class="brand">💰 مدیریت بودجه</a>
+    <div class="links">
+      <a href="{% url 'dashboard' %}" class="{% block nav_dashboard %}{% endblock %}"><span class="hide-mobile">داشبورد</span></a>
+      <a href="{% url 'transaction_list' %}" class="{% block nav_transactions %}{% endblock %}"><span class="hide-mobile">تراکنش‌ها</span></a>
+      <a href="{% url 'budget_list' %}" class="{% block nav_budgets %}{% endblock %}"><span class="hide-mobile">بودجه</span></a>
+      <a href="{% url 'recurring_list' %}" class="{% block nav_recurring %}{% endblock %}"><span class="hide-mobile">تکرارشونده</span></a>
+      <a href="{% url 'goal_list' %}" class="{% block nav_goals %}{% endblock %}"><span class="hide-mobile">اهداف</span></a>
+      <a href="{% url 'category_list' %}" class="{% block nav_categories %}{% endblock %}"><span class="hide-mobile">دسته‌بندی‌ها</span></a>
+      <a href="{% url 'transaction_add' %}" class="btn-primary btn" style="padding:8px 14px;">+ جدید</a>
+      <a href="{% url 'logout' %}" class="logout" title="خروج">خروج ↩</a>
+    </div>
+  </nav>
+  {% endif %}
+
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="toast" id="toast-{{ forloop.counter0 }}">{{ message }}</div>
+    {% endfor %}
+    <script>
+      document.querySelectorAll('.toast').forEach(function (el, i) {
+        setTimeout(function () { el.classList.add('show'); }, 300);
+        setTimeout(function () { el.classList.remove('show'); }, 3000);
+      });
+    </script>
+  {% endif %}
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

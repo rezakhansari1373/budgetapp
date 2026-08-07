@@ -1,0 +1,150 @@
+{% extends 'budget/base.html' %}
+{% load fa_filters %}
+{% block nav_budgets %}active{% endblock %}
+{% block title %}بودجه | مدیریت بودجه{% endblock %}
+
+{% block extra_css %}
+<style>
+  .budget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+  .budget-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    position: relative;
+    transition: all 0.2s;
+  }
+  .budget-item:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+  .budget-item .head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .budget-item .head .name { font-size: 15px; font-weight: 800; }
+  .budget-item .head .del {
+    position: absolute; top: 10px; left: 10px;
+    background: #fee2e2; color: var(--danger);
+    border: none; width: 24px; height: 24px; border-radius: 8px;
+    cursor: pointer; font-size: 13px; display: none;
+  }
+  .budget-item:hover .del { display: block; }
+  .budget-item .nums { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 6px; }
+  .budget-item .spent { font-size: 15px; font-weight: 800; }
+  .budget-item .limit { font-size: 12px; color: var(--muted); }
+  .budget-item .bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .status-badge { font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
+  .status-badge.ok { background: #d1fae5; color: #065f46; }
+  .status-badge.warn { background: #fef3c7; color: #92400e; }
+  .status-badge.over { background: #fee2e2; color: #991b1b; }
+  .edit-btn-row { margin-top: 12px; }
+  .budget-month-form { display: flex; gap: 6px; align-items: center; }
+  .budget-month-form select { width: auto; padding: 6px 10px; font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-row">
+  <div>
+    <h1>بودجه ماهانه</h1>
+    <div class="sub">سقف هزینه دسته‌های مختلف در ماه {{ persian_month_name }} {{ year|pnum }}</div>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <form method="get" class="budget-month-form">
+      <select name="b_year" class="form-control">
+        {% for y in budget_years %}
+        <option value="{{ y }}" {% if y == b_year %}selected{% endif %}>{{ y|pnum }}</option>
+        {% endfor %}
+      </select>
+      <select name="b_month" class="form-control">
+        {% for m in months %}
+        <option value="{{ m }}" {% if m == b_month %}selected{% endif %}>{{ m|pmonth }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-outline btn-sm">برو</button>
+    </form>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline">← داشبورد</a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:24px; max-width:520px;">
+  <div class="section-title">➕ افزودن بودجه جدید</div>
+  <form method="post" action="{% url 'budget_add' %}">
+    {% csrf_token %}
+    <div class="form-group">
+      <label>دسته (هزینه)</label>
+      <select name="category" class="form-control" required>
+        {% if available %}
+        <option value="" selected disabled>انتخاب دسته…</option>
+        {% for c in available %}
+        <option value="{{ c.pk }}">{{ c.icon }} {{ c.name }}</option>
+        {% endfor %}
+        {% else %}
+        <option value="" disabled>همه دسته‌های هزینه بودجه دارند</option>
+        {% endif %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>سقف ماهانه (تومان)</label>
+      <input type="number" name="amount" class="form-control" required min="1" placeholder="مثلاً: 5000000" dir="ltr">
+    </div>
+    <button type="submit" class="btn btn-primary" {% if not available %}disabled{% endif %}>افزودن بودجه</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="section-title">🎯 بودجه‌های {{ persian_month_name }}</div>
+  {% if rows %}
+  <div class="budget-grid">
+    {% for r in rows %}
+    <div class="budget-item">
+      <form method="post" action="{% url 'budget_delete' r.budget.pk %}" onsubmit="return confirm('این بودجه حذف شود؟');">
+        {% csrf_token %}
+        <button type="submit" class="del" title="حذف">✕</button>
+      </form>
+      <div class="head">
+        <span class="icon-circle">{{ r.budget.category.icon }}</span>
+        <span class="name">{{ r.budget.category.name }}</span>
+      </div>
+      <div class="nums">
+        <span class="spent amount-expense">{{ r.spent|pmoney }}</span>
+        <span class="limit">از {{ r.budget.amount|pmoney }} تومان</span>
+      </div>
+      <div class="progress">
+        <div class="progress-fill {{ r.status }}" style="width: {{ r.pct|floatformat:0 }}%;"></div>
+      </div>
+      <div class="bottom">
+        <span class="status-badge {{ r.status }}">
+          {% if r.status == 'over' %}🔴 اضافه بودجه{% elif r.status == 'warn' %}🟡 رو به پایان{% else %}🟢 در بودجه{% endif %}
+        </span>
+        <span class="limit">
+          {% if r.status == 'over' %}{{ r.over_by|pmoney }} اضافه{% else %}{{ r.remaining|pmoney }} مانده{% endif %}
+        </span>
+      </div>
+      <div class="edit-btn-row">
+        <button type="button" class="btn btn-ghost btn-sm" style="width:100%;" onclick="openEdit({{ r.budget.pk }})">✏️ تغییر سقف</button>
+        <div id="edit-{{ r.budget.pk }}" style="display:none; margin-top:8px;">
+          <form method="post" action="{% url 'budget_edit' r.budget.pk %}">
+            {% csrf_token %}
+            <div style="display:flex; gap:8px;">
+              <input type="number" name="amount" class="form-control" value="{{ r.budget.amount }}" required min="1" dir="ltr" style="font-size:13px; padding:6px 10px;">
+              <button type="submit" class="btn btn-primary btn-sm">💾</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <div class="big">🎯</div>
+    هنوز بودجه‌ای تعیین نکرده‌اید. از فرم بالا برای هر دسته هزینه، سقف ماهانه تعیین کنید.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function openEdit(pk) {
+    var form = document.getElementById('edit-' + pk);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,312 @@
+{% extends 'budget/base.html' %}
+{% load fa_filters %}
+{% block nav_goals %}active{% endblock %}
+{% block title %}اهداف پس‌انداز | مدیریت بودجه{% endblock %}
+
+{% block extra_css %}
+<style>
+  .goal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+  .goal-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    position: relative;
+    transition: all 0.2s;
+  }
+  .goal-item:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+  .goal-item .head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .goal-item .head .title { font-size: 15px; font-weight: 800; flex: 1; }
+  .goal-item .head .del {
+    position: absolute; top: 10px; left: 10px;
+    background: #fee2e2; color: var(--danger);
+    border: none; width: 24px; height: 24px; border-radius: 8px;
+    cursor: pointer; font-size: 13px; display: none;
+  }
+  .goal-item:hover .del { display: block; }
+  .goal-item .icon-big { font-size: 28px; }
+  .goal-item .nums { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 6px; }
+  .goal-item .saved { font-size: 15px; font-weight: 800; color: var(--primary); }
+  .goal-item .target { font-size: 12px; color: var(--muted); }
+  .goal-item .bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .goal-item .done-badge { background: #d1fae5; color: #065f46; font-weight: 700; padding: 4px 12px; border-radius: 999px; font-size: 12px; }
+  .deposit-row { display: flex; gap: 8px; margin-top: 12px; }
+  .deposit-row input { flex: 1; }
+  .icon-picker { border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; background: #f8fafc; }
+  .icon-picker-head { display: flex; align-items: center; gap: 12px; }
+  .icon-preview {
+    width: 48px; height: 48px; border-radius: 12px; background: #fff;
+    border: 1.5px solid var(--border); display: flex; align-items: center;
+    justify-content: center; font-size: 26px;
+  }
+  .icon-picker-body { margin-top: 12px; max-height: 320px; overflow-y: auto; border-top: 1px solid var(--border); padding-top: 12px; }
+  .icon-group { margin-bottom: 14px; }
+  .icon-group-title { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+  .icon-option {
+    border: 1px solid var(--border); background: #fff; border-radius: 10px;
+    font-size: 22px; padding: 6px 0; cursor: pointer; transition: all 0.15s; line-height: 1;
+  }
+  .icon-option:hover { border-color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
+  .icon-option.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 2px var(--primary-light); }
+  .jdate-row { display: flex; gap: 8px; align-items: end; }
+  .jdate-row > div { flex: 1; }
+  .jdate-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 700; }
+  .jdate-row select { font-size: 13px; padding: 8px 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-row">
+  <div>
+    <h1>اهداف پس‌انداز</h1>
+    <div class="sub">برای خریدها، سفرها و آینده هدف تعیین کنید و پیشرفت را دنبال کنید</div>
+  </div>
+  <a href="{% url 'dashboard' %}" class="btn btn-outline">← داشبورد</a>
+</div>
+
+<div class="card" style="margin-bottom:24px; max-width:520px;">
+  <div class="section-title">➕ افزودن هدف جدید</div>
+  <form method="post" action="{% url 'goal_add' %}">
+    {% csrf_token %}
+    <div class="form-group">
+      <label>عنوان</label>
+      <input type="text" name="title" class="form-control" required placeholder="مثلاً: سفر به مشهد">
+    </div>
+    <div class="form-group">
+      <label>آیکون</label>
+      <div class="icon-picker">
+        <div class="icon-picker-head">
+          <span class="icon-preview" id="add-icon-preview">🎯</span>
+          <button type="button" class="btn btn-outline btn-sm" onclick="togglePicker('add')">😀 انتخاب آیکون</button>
+        </div>
+        <input type="hidden" name="icon" id="add-icon-input" value="🎯">
+        <div class="icon-picker-body" id="add-icon-body" style="display:none;">
+          {% for label, icons in icon_groups %}
+          <div class="icon-group">
+            <div class="icon-group-title">{{ label }}</div>
+            <div class="icon-grid">
+              {% for icon in icons %}
+              <button type="button" class="icon-option" data-icon="{{ icon }}" onclick="pickIcon('add', '{{ icon }}')">{{ icon }}</button>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>مبلغ هدف (تومان)</label>
+      <input type="number" name="target_amount" class="form-control" required min="1" placeholder="مثلاً: 20000000" dir="ltr">
+    </div>
+    <div class="form-group">
+      <label>تاریخ هدف (شمسی — اختیاری)</label>
+      <div class="jdate-row">
+        <div>
+          <span class="jdate-label">سال</span>
+          <select name="target_year" id="add-y" class="form-control j-year" data-prefix="add">
+            <option value="">بدون تاریخ</option>
+            {% for y in goal_years %}
+            <option value="{{ y }}" {% if y == default_y %}selected{% endif %}>{{ y|pnum }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <span class="jdate-label">ماه</span>
+          <select name="target_month" id="add-m" class="form-control j-month" data-prefix="add">
+            <option value="">-</option>
+            {% for m in months %}
+            <option value="{{ m }}" {% if m == default_m %}selected{% endif %}>{{ m|pmonth }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <span class="jdate-label">روز</span>
+          <select name="target_day" id="add-d" class="form-control j-day" data-prefix="add">
+            <option value="">-</option>
+            {% for d in days %}
+            <option value="{{ d }}" {% if d == default_d %}selected{% endif %}>{{ d|pnum }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">افزودن هدف</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="section-title">🎯 اهداف شما</div>
+  {% if goal_rows %}
+  <div class="goal-grid">
+    {% for r in goal_rows %}
+    <div class="goal-item">
+      <form method="post" action="{% url 'goal_delete' r.goal.pk %}" onsubmit="return confirm('این هدف حذف شود؟');">
+        {% csrf_token %}
+        <button type="submit" class="del" title="حذف">✕</button>
+      </form>
+      <div class="head">
+        <span class="icon-big">{{ r.goal.icon }}</span>
+        <span class="title">{{ r.goal.title }}</span>
+      </div>
+      <div class="nums">
+        <span class="saved">{{ r.goal.saved_amount|pmoney }}</span>
+        <span class="target">از {{ r.goal.target_amount|pmoney }} تومان</span>
+      </div>
+      <div class="progress">
+        <div class="progress-fill {% if r.done %}ok{% else %}warn{% endif %}" style="width: {{ r.pct|floatformat:0 }}%;"></div>
+      </div>
+      <div class="bottom">
+        <span>{{ r.pct|floatformat:0|pnum }}٪ تکمیل</span>
+        <span>
+          {% if r.done %}🎉 به هدف رسیده‌اید!
+          {% elif r.days_left is not None %}{{ r.remaining|pmoney }} مانده · {% if r.days_left < 0 %}تاریخ گذشته{% else %}{{ r.days_left|pnum }} روز مانده{% endif %}
+          {% else %}{{ r.remaining|pmoney }} مانده{% endif %}
+        </span>
+      </div>
+      <form method="post" action="{% url 'goal_deposit' r.goal.pk %}" class="deposit-row">
+        {% csrf_token %}
+        <input type="number" name="amount" class="form-control" placeholder="افزودن به پس‌انداز…" required min="1" dir="ltr" style="font-size:13px; padding:6px 10px;">
+        <button type="submit" class="btn btn-primary btn-sm">+ افزودن</button>
+      </form>
+      <button type="button" class="btn btn-ghost btn-sm" style="width:100%; margin-top:8px;" onclick="openEdit({{ r.goal.pk }})">✏️ تغییر هدف</button>
+      <div id="edit-{{ r.goal.pk }}" style="display:none; margin-top:12px;">
+        <form method="post" action="{% url 'goal_edit' r.goal.pk %}">
+          {% csrf_token %}
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">عنوان</label>
+            <input type="text" name="title" class="form-control" value="{{ r.goal.title }}" required style="font-size:13px; padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">آیکون</label>
+            <div class="icon-picker" style="padding:8px;">
+              <div class="icon-picker-head">
+                <span class="icon-preview" style="width:38px; height:38px; font-size:20px;" id="edit-{{ r.goal.pk }}-icon-preview">{{ r.goal.icon }}</span>
+                <button type="button" class="btn btn-outline btn-sm" onclick="togglePicker('edit-{{ r.goal.pk }}')">😀 انتخاب آیکون</button>
+              </div>
+              <input type="hidden" name="icon" id="edit-{{ r.goal.pk }}-icon-input" value="{{ r.goal.icon }}">
+              <div class="icon-picker-body" id="edit-{{ r.goal.pk }}-icon-body" style="display:none; max-height:220px;">
+                {% for label, icons in icon_groups %}
+                <div class="icon-group">
+                  <div class="icon-group-title">{{ label }}</div>
+                  <div class="icon-grid">
+                    {% for icon in icons %}
+                    <button type="button" class="icon-option" data-icon="{{ icon }}" onclick="pickIcon('edit-{{ r.goal.pk }}', '{{ icon }}')">{{ icon }}</button>
+                    {% endfor %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">مبلغ هدف (تومان)</label>
+            <input type="number" name="target_amount" class="form-control" value="{{ r.goal.target_amount }}" required min="1" dir="ltr" style="font-size:13px; padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">پس‌انداز شده (تومان)</label>
+            <input type="number" name="saved_amount" class="form-control" value="{{ r.goal.saved_amount }}" required min="0" dir="ltr" style="font-size:13px; padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">تاریخ هدف (شمسی)</label>
+            <div class="jdate-row">
+              <div>
+                <span class="jdate-label">سال</span>
+                <select name="target_year" id="edit-{{ r.goal.pk }}-y" class="form-control j-year" data-prefix="edit-{{ r.goal.pk }}">
+                  <option value="" {% if not r.has_date %}selected{% endif %}>بدون تاریخ</option>
+                  {% for y in goal_years %}
+                  <option value="{{ y }}" {% if r.jy == y %}selected{% endif %}>{{ y|pnum }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <span class="jdate-label">ماه</span>
+                <select name="target_month" id="edit-{{ r.goal.pk }}-m" class="form-control j-month" data-prefix="edit-{{ r.goal.pk }}">
+                  <option value="" {% if not r.has_date %}selected{% endif %}>-</option>
+                  {% for m in months %}
+                  <option value="{{ m }}" {% if r.jm == m %}selected{% endif %}>{{ m|pmonth }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <span class="jdate-label">روز</span>
+                <select name="target_day" id="edit-{{ r.goal.pk }}-d" class="form-control j-day" data-prefix="edit-{{ r.goal.pk }}">
+                  <option value="" {% if not r.has_date %}selected{% endif %}>-</option>
+                  {% for d in days %}
+                  <option value="{{ d }}" {% if r.jd == d %}selected{% endif %}>{{ d|pnum }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">💾 ذخیره</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <div class="big">🎯</div>
+    هنوز هدفی تعریف نکرده‌اید. از فرم بالا مثلاً «سفر به مشهد» با مبلغ ۲۰ میلیون تومان را بسازید.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function openEdit(pk) {
+    var form = document.getElementById('edit-' + pk);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function togglePicker(prefix) {
+    var body = document.getElementById(prefix + '-icon-body');
+    var isHidden = body.style.display === 'none';
+    document.querySelectorAll('.icon-picker-body').forEach(function (el) { el.style.display = 'none'; });
+    body.style.display = isHidden ? 'block' : 'none';
+  }
+
+  function pickIcon(prefix, icon) {
+    document.getElementById(prefix + '-icon-input').value = icon;
+    document.getElementById(prefix + '-icon-preview').textContent = icon;
+    document.getElementById(prefix + '-icon-body').style.display = 'none';
+    document.querySelectorAll('.icon-option').forEach(function (el) { el.classList.remove('selected'); });
+  }
+
+  var FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+  function faDigits(n) { return String(n).replace(/\d/g, function (d) { return FA_DIGITS[d]; }); }
+
+  function jIsLeap(year) {
+    return ((((((year - 474) % 2820) + 474) + 38) * 682) % 2816) < 682;
+  }
+
+  function jDaysInMonth(year, month) {
+    if (month <= 6) return 31;
+    if (month <= 11) return 30;
+    return jIsLeap(year) ? 30 : 29;
+  }
+
+  function rebuildDays(prefix) {
+    var yEl = document.getElementById(prefix + '-y');
+    var mEl = document.getElementById(prefix + '-m');
+    var dEl = document.getElementById(prefix + '-d');
+    var y = parseInt(yEl.value, 10);
+    var m = parseInt(mEl.value, 10);
+    if (!y || !m) { dEl.innerHTML = '<option value="">-</option>'; return; }
+    var max = jDaysInMonth(y, m);
+    var cur = parseInt(dEl.value, 10) || 1;
+    var html = '<option value="">-</option>';
+    for (var i = 1; i <= max; i++) {
+      html += '<option value="' + i + '"' + (i === Math.min(cur, max) ? ' selected' : '') + '>' + faDigits(i) + '</option>';
+    }
+    dEl.innerHTML = html;
+  }
+
+  document.querySelectorAll('.j-year, .j-month').forEach(function (el) {
+    el.addEventListener('change', function () { rebuildDays(el.dataset.prefix); });
+  });
+  document.querySelectorAll('.j-day').forEach(function (el) { rebuildDays(el.dataset.prefix); });
+</script>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'budget/base.html' %}
+{% block title %}ورود | مدیریت بودجه{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="logo">💰</div>
+    <h1>مدیریت بودجه</h1>
+    <p class="hint">برای ورود، نام کاربری و رمز عبور خود را وارد کنید</p>
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <ul class="errorlist">
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+      <div class="form-group">
+        <label>نام کاربری</label>
+        <input type="text" name="username" class="form-control" required autofocus>
+      </div>
+      <div class="form-group">
+        <label>رمز عبور</label>
+        <input type="password" name="password" class="form-control" required>
+      </div>
+      <button type="submit" class="btn btn-primary">ورود</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

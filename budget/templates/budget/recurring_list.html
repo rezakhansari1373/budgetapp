@@ -1,0 +1,167 @@
+{% extends 'budget/base.html' %}
+{% load fa_filters %}
+{% block nav_recurring %}active{% endblock %}
+{% block title %}تراکنش‌های تکراری | مدیریت بودجه{% endblock %}
+
+{% block extra_css %}
+<style>
+  .rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+  .rec-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    position: relative;
+    transition: all 0.2s;
+  }
+  .rec-item:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+  .rec-item.inactive { opacity: 0.55; }
+  .rec-item .head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .rec-item .head .name { font-size: 15px; font-weight: 800; }
+  .rec-item .head .del {
+    position: absolute; top: 10px; left: 10px;
+    background: #fee2e2; color: var(--danger);
+    border: none; width: 24px; height: 24px; border-radius: 8px;
+    cursor: pointer; font-size: 13px; display: none;
+  }
+  .rec-item:hover .del { display: block; }
+  .rec-item .meta { font-size: 12px; color: var(--muted); margin-bottom: 10px; line-height: 1.8; }
+  .rec-item .amount { font-size: 16px; font-weight: 800; }
+  .rec-item .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .toggle-btn {
+    border: none; border-radius: 8px; padding: 6px 12px; font-size: 12px;
+    font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .toggle-btn.on { background: #d1fae5; color: #065f46; }
+  .toggle-btn.off { background: #e2e8f0; color: #334155; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-row">
+  <div>
+    <h1>تراکنش‌های تکراری</h1>
+    <div class="sub">پرداخت‌های ماهانه مثل اجاره، اشتراک و قسط که خودکار ساخته می‌شوند</div>
+  </div>
+  <a href="{% url 'transaction_list' %}" class="btn btn-outline">← لیست تراکنش‌ها</a>
+</div>
+
+<div class="card" style="margin-bottom:24px; max-width:520px;">
+  <div class="section-title">➕ افزودن تراکنش تکراری</div>
+  <form method="post" action="{% url 'recurring_add' %}">
+    {% csrf_token %}
+    <div class="form-group">
+      <label>نوع</label>
+      <div class="radio-group">
+        <label><input type="radio" name="type" value="expense" checked> هزینه</label>
+        <label><input type="radio" name="type" value="income"> درآمد</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>دسته</label>
+      <select name="category" class="form-control" required>
+        <option value="" selected disabled>انتخاب دسته…</option>
+        {% for c in expense_categories %}
+        <option value="{{ c.pk }}">{{ c.icon }} {{ c.name }} (هزینه)</option>
+        {% endfor %}
+        {% for c in income_categories %}
+        <option value="{{ c.pk }}">{{ c.icon }} {{ c.name }} (درآمد)</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>مبلغ (تومان)</label>
+      <input type="number" name="amount" class="form-control" required min="1" placeholder="مثلاً: 8000000" dir="ltr">
+    </div>
+    <div class="form-group">
+      <label>روز هر ماه</label>
+      <select name="day_of_month" class="form-control">
+        {% for d in days %}
+        <option value="{{ d }}" {% if d == 1 %}selected{% endif %}>{{ d|pnum }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>تاریخ شروع (شمسی)</label>
+      <input type="text" name="start_date" class="form-control" required placeholder="مثلاً ۱۴۰۵/۰۵/۰۱" dir="ltr" inputmode="numeric">
+    </div>
+    <div class="form-group">
+      <label>توضیحات</label>
+      <input type="text" name="note" class="form-control" placeholder="مثلاً: اجاره خانه" maxlength="200">
+    </div>
+    <button type="submit" class="btn btn-primary">افزودن</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="section-title">🔄 تراکنش‌های تکراری فعال</div>
+  {% if recurrings %}
+  <div class="rec-grid">
+    {% for r in recurrings %}
+    <div class="rec-item {% if not r.active %}inactive{% endif %}">
+      <form method="post" action="{% url 'recurring_delete' r.pk %}" onsubmit="return confirm('این تراکنش تکراری حذف شود؟');">
+        {% csrf_token %}
+        <button type="submit" class="del" title="حذف">✕</button>
+      </form>
+      <div class="head">
+        <span class="icon-circle">{{ r.category.icon }}</span>
+        <span class="name">{{ r.category.name }}</span>
+        {% if r.type == 'income' %}<span class="badge income">درآمد</span>{% else %}<span class="badge expense">هزینه</span>{% endif %}
+      </div>
+      <div class="amount {% if r.type == 'income' %}amount-income{% else %}amount-expense{% endif %}">{{ r.amount|pmoney }} تومان</div>
+      <div class="meta">
+        📅 هر ماه روز {{ r.day_of_month|pnum }}<br>
+        🗓 شروع: {{ r.start_date|jdate }}<br>
+        {% if r.note %}📝 {{ r.note }}{% endif %}
+      </div>
+      <div class="actions">
+        <form method="post" action="{% url 'recurring_toggle' r.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="toggle-btn {% if r.active %}on{% else %}off{% endif %}">
+            {% if r.active %}🟢 فعال{% else %}⚪ غیرفعال{% endif %}
+          </button>
+        </form>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="openEdit({{ r.pk }})">✏️ تغییر</button>
+      </div>
+      <div id="edit-{{ r.pk }}" style="display:none; margin-top:12px;">
+        <form method="post" action="{% url 'recurring_edit' r.pk %}">
+          {% csrf_token %}
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">مبلغ (تومان)</label>
+            <input type="number" name="amount" class="form-control" value="{{ r.amount }}" required min="1" dir="ltr" style="font-size:13px; padding:6px 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">روز هر ماه</label>
+            <select name="day_of_month" class="form-control" style="font-size:13px; padding:6px 10px;">
+              {% for d in days %}
+              <option value="{{ d }}" {% if d == r.day_of_month %}selected{% endif %}>{{ d|pnum }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">توضیحات</label>
+            <input type="text" name="note" class="form-control" value="{{ r.note }}" maxlength="200" style="font-size:13px; padding:6px 10px;">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">💾 ذخیره</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <div class="big">🔄</div>
+    هنوز تراکنش تکراری ندارید. از فرم بالا مثلاً «اجاره خانه» با روز اول هر ماه را تعریف کنید.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function openEdit(pk) {
+    var form = document.getElementById('edit-' + pk);
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  }
+</script>
+{% endblock %}

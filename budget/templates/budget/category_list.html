@@ -1,0 +1,152 @@
+{% extends 'budget/base.html' %}
+{% load fa_filters %}
+{% block nav_categories %}active{% endblock %}
+{% block title %}دسته‌بندی‌ها | مدیریت بودجه{% endblock %}
+
+{% block extra_css %}
+<style>
+  .icon-picker { border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; background: #f8fafc; }
+  .icon-picker-head { display: flex; align-items: center; gap: 12px; }
+  .icon-preview {
+    width: 48px; height: 48px; border-radius: 12px; background: #fff;
+    border: 1.5px solid var(--border); display: flex; align-items: center;
+    justify-content: center; font-size: 26px;
+  }
+  .icon-picker-body { margin-top: 12px; max-height: 320px; overflow-y: auto; border-top: 1px solid var(--border); padding-top: 12px; }
+  .icon-group { margin-bottom: 14px; }
+  .icon-group-title { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+  .icon-option {
+    border: 1px solid var(--border); background: #fff; border-radius: 10px;
+    font-size: 22px; padding: 6px 0; cursor: pointer; transition: all 0.15s; line-height: 1;
+  }
+  .icon-option:hover { border-color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
+  .icon-option.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 2px var(--primary-light); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-row">
+  <div>
+    <h1>دسته‌بندی‌ها</h1>
+    <div class="sub">مدیریت دسته‌های درآمد و هزینه</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:24px; max-width:520px;">
+  <div class="section-title">➕ افزودن دسته جدید</div>
+  <form method="post" action="{% url 'category_add' %}">
+    {% csrf_token %}
+    <div class="form-group">
+      <label>نام</label>
+      <input type="text" name="name" class="form-control" required placeholder="مثلاً: کرایه خانه">
+    </div>
+    <div class="form-group">
+      <label>آیکون</label>
+      <div class="icon-picker">
+        <div class="icon-picker-head">
+          <span class="icon-preview" id="add-icon-preview">📁</span>
+          <button type="button" class="btn btn-outline btn-sm" onclick="togglePicker('add')">😀 انتخاب آیکون</button>
+        </div>
+        <input type="hidden" name="icon" id="add-icon-input" value="📁">
+        <div class="icon-picker-body" id="add-icon-body" style="display:none;">
+          {% for label, icons in icon_groups %}
+          <div class="icon-group">
+            <div class="icon-group-title">{{ label }}</div>
+            <div class="icon-grid">
+              {% for icon in icons %}
+              <button type="button" class="icon-option" data-icon="{{ icon }}" onclick="pickIcon('add', '{{ icon }}')">{{ icon }}</button>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>نوع</label>
+      <select name="type" class="form-control">
+        <option value="expense">هزینه</option>
+        <option value="income">درآمد</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">افزودن</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="section-title">🧾 دسته‌بندی‌ها</div>
+  {% if categories %}
+  <div class="cat-grid">
+    {% for c in categories %}
+    <div class="cat-item">
+      <form method="post" action="{% url 'category_delete' c.pk %}" onsubmit="return confirm('این دسته حذف شود؟\n(تراکنش‌های آن دسته حذف نمی‌شوند)');">
+        {% csrf_token %}
+        <button type="submit" class="del" title="حذف">✕</button>
+      </form>
+      <div class="icon">{{ c.icon }}</div>
+      <div class="name">{{ c.name }}</div>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">
+        {% if c.type == 'income' %}<span class="badge income">درآمد</span>{% else %}<span class="badge expense">هزینه</span>{% endif %}
+      </div>
+      <button type="button" class="btn-ghost btn btn-sm edit-btn" style="margin-top:8px;" onclick="openEdit({{ c.pk }})">✏️ تغییر</button>
+      <div class="edit-form" id="edit-{{ c.pk }}" style="display:none; margin-top:10px;">
+        <form method="post" action="{% url 'category_edit' c.pk %}">
+          {% csrf_token %}
+          <input type="text" name="name" class="form-control" value="{{ c.name }}" required style="font-size:13px; padding:6px 10px;">
+          <div class="icon-picker" style="margin-top:8px; padding:8px;">
+            <div class="icon-picker-head">
+              <span class="icon-preview" style="width:38px; height:38px; font-size:20px;" id="edit-{{ c.pk }}-icon-preview">{{ c.icon }}</span>
+              <button type="button" class="btn btn-outline btn-sm" onclick="togglePicker('edit-{{ c.pk }}')">😀 انتخاب آیکون</button>
+            </div>
+            <input type="hidden" name="icon" id="edit-{{ c.pk }}-icon-input" value="{{ c.icon }}">
+            <div class="icon-picker-body" id="edit-{{ c.pk }}-icon-body" style="display:none; max-height:220px;">
+              {% for label, icons in icon_groups %}
+              <div class="icon-group">
+                <div class="icon-group-title">{{ label }}</div>
+                <div class="icon-grid">
+                  {% for icon in icons %}
+                  <button type="button" class="icon-option" data-icon="{{ icon }}" onclick="pickIcon('edit-{{ c.pk }}', '{{ icon }}')">{{ icon }}</button>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px; width:100%;">💾 ذخیره</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty"><div class="big">🗂</div>هنوز دسته‌ای اضافه نکرده‌اید.</div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function openEdit(pk) {
+    var form = document.getElementById('edit-' + pk);
+    var isHidden = form.style.display === 'none';
+    document.querySelectorAll('.edit-form').forEach(function (el) { el.style.display = 'none'; });
+    document.querySelectorAll('.icon-picker-body').forEach(function (el) { el.style.display = 'none'; });
+    form.style.display = isHidden ? 'block' : 'none';
+  }
+
+  function togglePicker(prefix) {
+    var body = document.getElementById(prefix + '-icon-body');
+    var isHidden = body.style.display === 'none';
+    document.querySelectorAll('.icon-picker-body').forEach(function (el) { el.style.display = 'none'; });
+    body.style.display = isHidden ? 'block' : 'none';
+  }
+
+  function pickIcon(prefix, icon) {
+    document.getElementById(prefix + '-icon-input').value = icon;
+    document.getElementById(prefix + '-icon-preview').textContent = icon;
+    document.getElementById(prefix + '-icon-body').style.display = 'none';
+    document.querySelectorAll('.icon-option').forEach(function (el) { el.classList.remove('selected'); });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends 'budget/base.html' %}
+{% load fa_filters %}
+{% block nav_transactions %}active{% endblock %}
+{% block title %}تراکنش‌ها | مدیریت بودجه{% endblock %}
+
+{% block content %}
+<div class="header-row">
+  <div>
+    <h1>لیست تراکنش‌ها</h1>
+    <div class="sub">جستجو و فیلتر بین تمام تراکنش‌ها</div>
+  </div>
+  <a href="{% url 'transaction_add' %}" class="btn btn-primary">+ افزودن تراکنش</a>
+</div>
+
+<div class="card" style="margin-bottom:24px;">
+  <form method="get" class="filter-bar">
+    <div class="form-group" style="flex:1; min-width:200px;">
+      <label>🔍 جستجو</label>
+      <input type="text" name="q" value="{{ selected.q }}" class="form-control" placeholder="متن یادداشت یا نام دسته…">
+    </div>
+    <div class="form-group">
+      <label>سال</label>
+      <select name="year" class="form-control">
+        <option value="">همه</option>
+        {% for y in years %}
+        <option value="{{ y }}" {% if selected.year == y|stringformat:'s' %}selected{% endif %}>{{ y|pnum }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>ماه</label>
+      <select name="month" class="form-control">
+        <option value="">همه</option>
+        {% for m in months %}
+        <option value="{{ m }}" {% if selected.month == m|stringformat:'s' %}selected{% endif %}>{{ m|pmonth }} ({{ m|pnum }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>دسته</label>
+      <select name="category" class="form-control">
+        <option value="">همه</option>
+        {% for c in categories %}
+        <option value="{{ c.pk }}" {% if selected.category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.icon }} {{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>نوع</label>
+      <select name="type" class="form-control">
+        <option value="">همه</option>
+        <option value="income" {% if selected.type == 'income' %}selected{% endif %}>درآمد</option>
+        <option value="expense" {% if selected.type == 'expense' %}selected{% endif %}>هزینه</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>حداقل مبلغ</label>
+      <input type="number" name="amount_min" value="{{ selected.amount_min }}" class="form-control" placeholder="۰" dir="ltr" style="min-width:110px;">
+    </div>
+    <div class="form-group">
+      <label>حداکثر مبلغ</label>
+      <input type="number" name="amount_max" value="{{ selected.amount_max }}" class="form-control" placeholder="∞" dir="ltr" style="min-width:110px;">
+    </div>
+    <button type="submit" class="btn btn-primary">فیلتر</button>
+    <a href="{% url 'transaction_list' %}" class="btn btn-outline">حذف فیلتر</a>
+  </form>
+  <div class="export-row" style="display:flex; align-items:center; gap:8px; padding-top:14px; border-top:1px solid var(--border); font-size:13px; color:var(--muted);">
+    <span>📥 دانلود فایل: </span>
+    <a href="{% url 'transaction_export' %}?year={{ selected.year }}&month={{ selected.month }}&category={{ selected.category }}&type={{ selected.type }}&q={{ selected.q }}&amount_min={{ selected.amount_min }}&amount_max={{ selected.amount_max }}&fmt=xlsx" class="btn btn-outline btn-sm">🟢 اکسل</a>
+    <a href="{% url 'transaction_export' %}?year={{ selected.year }}&month={{ selected.month }}&category={{ selected.category }}&type={{ selected.type }}&q={{ selected.q }}&amount_min={{ selected.amount_min }}&amount_max={{ selected.amount_max }}&fmt=csv" class="btn btn-outline btn-sm">📄 CSV</a>
+  </div>
+</div>
+
+<div class="stats-grid" style="margin-bottom:24px;">
+  <div class="stat income">
+    <div class="label">مجموع درآمد</div>
+    <div class="value">{{ total_income|pmoney }} تومان</div>
+  </div>
+  <div class="stat expense">
+    <div class="label">مجموع هزینه</div>
+    <div class="value">{{ total_expense|pmoney }} تومان</div>
+  </div>
+</div>
+
+<div class="card">
+  {% if transactions %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>تاریخ</th>
+          <th>دسته</th>
+          <th>توضیحات</th>
+          <th>نوع</th>
+          <th>مبلغ</th>
+          <th>عملیات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td>{{ t.date|jdate }}</td>
+          <td>{{ t.category.icon }} {{ t.category.name }}</td>
+          <td>{{ t.note|default:"—" }}</td>
+          <td>{% if t.type == 'income' %}<span class="badge income">درآمد</span>{% else %}<span class="badge expense">هزینه</span>{% endif %}</td>
+          <td class="{% if t.type == 'income' %}amount-income{% else %}amount-expense{% endif %}">{{ t.amount|pmoney }} تومان</td>
+          <td>
+            <a href="{% url 'transaction_edit' t.pk %}" class="btn-ghost btn btn-sm">✏️</a>
+            <form method="post" action="{% url 'transaction_delete' t.pk %}" style="display:inline;" onsubmit="return confirm('این تراکنش حذف شود؟');">
+              {% csrf_token %}
+              <button type="submit" class="btn-danger btn btn-sm">🗑</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><div class="big">🔍</div>تراکنشی با این فیلتر پیدا نشد.</div>
+  {% endif %}
+</div>
+{% endblock %}
