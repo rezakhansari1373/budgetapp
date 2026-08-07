@@ -1,7 +1,9 @@
 import csv
 from datetime import date, timedelta
 from io import BytesIO
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
 from django.http import HttpResponse
@@ -680,3 +682,11 @@ def goal_delete(request, pk):
     g = get_object_or_404(SavingsGoal, pk=pk, user=request.user)
     g.delete()
     return redirect('goal_list')
+
+
+def service_worker(request):
+    sw = Path(settings.BASE_DIR / 'budget' / 'static' / 'sw.js').read_text(encoding='utf-8')
+    response = HttpResponse(sw, content_type='application/javascript')
+    response['Service-Worker-Allowed'] = '/'
+    response['Cache-Control'] = 'no-cache'
+    return response

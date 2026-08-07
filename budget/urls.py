@@ -3,6 +3,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('sw.js', views.service_worker, name='service_worker'),
     path('', views.dashboard, name='dashboard'),
     path('transactions/', views.transaction_list, name='transaction_list'),
     path('transactions/export/', views.export_transactions, name='transaction_export'),

@@ -1,7 +1,9 @@
 from datetime import date
 from io import BytesIO
+from pathlib import Path
 
 import jdatetime
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -88,6 +90,26 @@ class BudgetAppTests(TestCase):
         response = self.client.get(reverse('dashboard'))
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('login'), response.url)
+
+    def test_service_worker(self):
+        response = self.client.get(reverse('service_worker'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/javascript')
+        self.assertEqual(response['Service-Worker-Allowed'], '/')
+        self.assertIn('addEventListener', response.content.decode())
+
+    def test_manifest_served(self):
+        manifest = Path(settings.BASE_DIR / 'budget' / 'static' / 'manifest.webmanifest')
+        self.assertTrue(manifest.exists())
+        self.assertIn('icon-192.png', manifest.read_text(encoding='utf-8'))
+
+    def test_login_page_has_pwa_tags(self):
+        self.client.logout()
+        response = self.client.get(reverse('login'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('manifest.webmanifest', content)
+        self.assertIn('/sw.js', content)
 
     def test_invalid_persian_date_rejected(self):
         response = self.client.post(reverse('transaction_add'), {

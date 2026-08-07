@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+db.sqlite3
+staticfiles/
+.env
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+deploy/
+README.md
