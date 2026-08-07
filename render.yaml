@@ -3,8 +3,8 @@ services:
     name: budgetapp
     runtime: python
     plan: free
-    buildCommand: "./build.sh"
-    startCommand: "./start.sh"
+    buildCommand: "bash build.sh"
+    startCommand: "bash start.sh"
     healthCheckPath: /login/
     envVars:
       - key: SECRET_KEY
